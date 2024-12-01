@@ -66,6 +66,20 @@ def is_valid_move(start, end, gap_size):
 
     return False
 
+def generate_segments(start, end):
+    segments = []
+    dx = (end[0] - start[0]) // 3
+    dy = (end[1] - start[1]) // 3
+
+    current_point = start
+    for i in range(1, 4): 
+        next_point = (current_point[0] + dx, current_point[1] + dy)
+        segments.append((current_point, next_point))
+        current_point = next_point
+
+    return segments
+
+
 def main(n):
     pygame.init()
 
@@ -80,6 +94,7 @@ def main(n):
 
     selected_dots = []
     lines = []
+    line_segments = set()
 
     running = True
     while running:
@@ -105,6 +120,11 @@ def main(n):
                                     start, end = selected_dots
                                     if is_valid_move(start, end, gap_size):
                                         lines.append((start, end))
+                                        # Generišemo segmente i dodajemo ih u set
+                                        segments = generate_segments(start, end)
+                                        for segment in segments:
+                                            line_segments.add(segment)
+
                                     selected_dots = []
                             break
 
