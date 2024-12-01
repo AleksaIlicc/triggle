@@ -72,13 +72,40 @@ def generate_segments(start, end):
     dy = (end[1] - start[1]) // 3
 
     current_point = start
-    for i in range(1, 4): 
+    for i in range(1, 4):
         next_point = (current_point[0] + dx, current_point[1] + dy)
         segments.append((current_point, next_point))
         current_point = next_point
 
     return segments
 
+def create_adjacent_list(dot_positions):
+    adjacent_list = {}
+
+    for i, row in enumerate(dot_positions):
+        for j, dot in enumerate(row):
+            adjacent_list[dot] = set()
+
+            if j > 0:
+                adjacent_list[dot].add(row[j - 1])
+            if j < len(row) - 1:
+                adjacent_list[dot].add(row[j + 1])
+
+            if i > 0:
+                prev_row = dot_positions[i - 1]
+                if j < len(prev_row):
+                    adjacent_list[dot].add(prev_row[j])
+                if j > 0:
+                    adjacent_list[dot].add(prev_row[j - 1])
+
+            if i < len(dot_positions) - 1:
+                next_row = dot_positions[i + 1]
+                if j < len(next_row):
+                    adjacent_list[dot].add(next_row[j])
+                if j < len(next_row) - 1:
+                    adjacent_list[dot].add(next_row[j + 1])
+
+    return adjacent_list
 
 def main(n):
     pygame.init()
@@ -87,14 +114,18 @@ def main(n):
     if board is None:
         print("Nevalidna veličina table. Veličina mora biti između 4 i 8.")
         return
+
     gap_size = 46
     window_width, window_height = setup_window(board, gap_size)
     screen = pygame.display.set_mode((window_width, window_height))
     pygame.display.set_caption("Triggle - AkoIspadne")
 
     selected_dots = []
-    lines = []
+    lines = set()
     line_segments = set()
+    triggles = set()
+    dot_positions = draw_board(board, screen, gap_size, selected_dots, lines)
+    adjacent_list = create_adjacent_list(dot_positions)
 
     running = True
     while running:
@@ -119,15 +150,22 @@ def main(n):
                                 if len(selected_dots) == 2:
                                     start, end = selected_dots
                                     if is_valid_move(start, end, gap_size):
-                                        lines.append((start, end))
-                                        # Generišemo segmente i dodajemo ih u set
+                                        lines.add((start, end))
+
                                         segments = generate_segments(start, end)
                                         for segment in segments:
-                                            line_segments.add(segment)
+                                            line_segments.add(frozenset(segment))
+
+                                            common_neighbors = adjacent_list[segment[0]] & adjacent_list[segment[1]]
+
+                                            for neighbor in common_neighbors:
+                                                if frozenset((segment[0], neighbor)) in line_segments and frozenset((segment[1], neighbor)) in line_segments:
+                                                    triangle = tuple(sorted([start, end, neighbor]))
+                                                    triggles.add(triangle)
 
                                     selected_dots = []
                             break
 
     pygame.quit()
 
-main(8)
+main(4)
