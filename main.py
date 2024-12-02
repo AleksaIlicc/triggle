@@ -1,3 +1,4 @@
+import random
 import pygame
 from utils.colors import *
 from utils.paths import *
@@ -38,7 +39,6 @@ def draw_text(screen, text, font, color, center, align='center'):
 
     screen.blit(text_surface, text_rect)
 
-
 def pre_game_setup(screen, width, height, base_font):
     pygame.font.init()
 
@@ -46,19 +46,32 @@ def pre_game_setup(screen, width, height, base_font):
 
     n = 4
     player = "X"
+    ai_player = None
+    game_mode = "PvP"
+    first_player = "X"
 
+    offset = 100
     while True:
         screen.fill(WHITE)
 
-        draw_text(screen, "Triggle", title_font, BLACK, (width // 2, height // 4 - 50))
+        draw_text(screen, "Triggle", title_font, BLACK, (width // 2, height // 5 - 50))
 
-        draw_text(screen, "Izaberite velicinu table (4-8):", base_font, BLACK, (width // 2, height // 3))
-        draw_text(screen, f"Trenutno: {n}", base_font, BLACK, (width // 2, height // 3 + 50))
+        draw_text(screen, "Izaberite mod igre (Player vs Player ili Player vs Computer):", base_font, BLACK, (width // 2, height // 3.5))
+        draw_text(screen, f"Trenutno: {"Player vs Player" if game_mode == "PvP" else "Player vs Computer"}", base_font, BLACK, (width // 2, height // 3.5 + 30))
 
-        draw_text(screen, "Izaberite pocetnog igraca (X ili O):", base_font, BLACK, (width // 2, height // 2))
-        draw_text(screen, f"Trenutni igrac: {player}", base_font, BLACK, (width // 2, height // 2 + 50))
+        draw_text(screen, "Izaberite velicinu table (4-8):", base_font, BLACK, (width // 2, height // 3.5 + offset))
+        draw_text(screen, f"Trenutno: {n}", base_font, BLACK, (width // 2, height // 3.5 + 30 + offset))
 
-        draw_text(screen, "Pritisnite Enter za pocetak igre", base_font, BLACK, (width // 2, height // 1.25))
+        draw_text(screen, "Izaberite pocetnog igraca (X ili O):" if game_mode == "PvP" else "Izaberite vaseg igraca (X ili O):", base_font, BLACK, (width // 2, height // 3.5 + 2 * offset))
+        draw_text(screen, f"Trenutni igrac: {player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 2 * offset))
+
+        if game_mode == "PvAI":
+            draw_text(screen, "Izaberite ko igra prvi (I za igraca ili A za AI):", base_font, BLACK, (width // 2, height // 3.5 + 3 * offset))
+            draw_text(screen, f"Trenutni prvi igrac: {first_player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 3 * offset))
+
+            draw_text(screen, "Pritisnite Enter za pocetak igre", base_font, BLACK, (width // 2, height // 1.15))
+        else:
+            draw_text(screen, "Pritisnite Enter za pocetak igre", base_font, BLACK, (width // 2, height // 1.15))
 
         pygame.display.flip()
 
@@ -69,7 +82,7 @@ def pre_game_setup(screen, width, height, base_font):
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    return n, player
+                    return n, player, game_mode, first_player
 
                 if event.key == pygame.K_UP:
                     n = min(8, n + 1)
@@ -78,9 +91,63 @@ def pre_game_setup(screen, width, height, base_font):
 
                 if event.key == pygame.K_x:
                     player = "X"
+                    ai_player = "O"
                 elif event.key == pygame.K_o:
                     player = "O"
+                    ai_player = "X"
 
+                if event.key == pygame.K_p:
+                    game_mode = "PvP"
+                    offset = 100
+                elif event.key == pygame.K_c:
+                    game_mode = "PvAI"
+                    offset = 80
+                    if player == "X":
+                        ai_player = "O"
+                    else:
+                        ai_player = "X"
+
+                if event.key == pygame.K_i:
+                    first_player = player
+                elif event.key == pygame.K_a:
+                    first_player = ai_player
+
+
+def show_dialog(screen, message, font, options):
+    screen.fill(WHITE)
+
+    message_lines = message.split('\n')
+    line_height = font.get_height()
+    y_offset = (screen.get_height() - len(message_lines) * line_height - (len(message_lines) - 1) * 10) // 3
+
+    for line in message_lines:
+        draw_text(screen, line, font, BLACK, (screen.get_width() // 2, y_offset), align='center')
+        y_offset += line_height + 10
+
+    button_width, button_height = 100, 40
+    gap = 16
+    buttons = []
+
+    total_button_width = len(options) * button_width + (len(options) - 1) * gap
+    for i, option in enumerate(options):
+        x = (screen.get_width() - total_button_width) // 2 + i * (button_width + gap)
+        y = screen.get_height() // 2 + 120
+        button_rect = pygame.Rect(x, y, button_width, button_height)
+        buttons.append((button_rect, option))
+        pygame.draw.rect(screen, LIGHT_GRAY, button_rect)
+        draw_text(screen, option, font, BLACK, button_rect.center, align='center')
+
+    pygame.display.flip()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for button, option in buttons:
+                    if button.collidepoint(event.pos):
+                        return option
 
 def draw_board(table, screen, gap_size, selected_dots, lines):
     total_rows = len(table)
@@ -108,7 +175,6 @@ def draw_board(table, screen, gap_size, selected_dots, lines):
 
     return dot_positions
 
-
 def is_valid_move(start, end, gap_size, lines):
 
     if (start,end) in lines:
@@ -128,7 +194,6 @@ def is_valid_move(start, end, gap_size, lines):
 
     return False
 
-
 def generate_segments(start, end):
     segments = []
     dx = (end[0] - start[0]) // 3
@@ -147,9 +212,8 @@ def create_triangle(point1, point2, point3):
     triangle.sort(key=lambda point: (point[0], point[1]))
     return tuple(triangle)
 
-def create_adjacent_list(dot_positions, n):
+def create_adjacent_list(dot_positions):
     adjacent_list = {}
-    total_rubber_bands = 0
 
     for i, row in enumerate(dot_positions):
         for j, dot in enumerate(row):
@@ -177,21 +241,96 @@ def create_adjacent_list(dot_positions, n):
                     adjacent_list[dot].add(next_row[j - 1])
                 if j < len(next_row) - 1:
                     adjacent_list[dot].add(next_row[j + 1])
-
-            if j + 3 < len(row):
-                total_rubber_bands += 1
-
-    total_rubber_bands *= 3
-
-    return adjacent_list, total_rubber_bands
+    return adjacent_list
 
 def create_font(path, size):
     return pygame.font.Font(path, size)
 
 def draw_scoreboard(screen, player, font, pointsX, pointsO):
+    scoreX_text = font.render(f"X: {pointsX}", True, BLACK)
+    scoreO_text = font.render(f"O: {pointsO}", True, BLACK)
+
+    scoreX_width = scoreX_text.get_width()
+    scoreO_width = scoreO_text.get_width()
+
     draw_text(screen, f"Trenutni igrač: {player}", font, BLACK, (10, 15), align='left')
-    draw_text(screen, f"X: {pointsX}", font, BLACK, (10, 35), align='left')
-    draw_text(screen, f"O: {pointsO}", font, BLACK, (10, 55), align='left')
+    screen.blit(scoreX_text, (10, 35))
+    screen.blit(scoreO_text, (10, 55))
+
+    x_triangle = [(12 + scoreX_width, 50), (19 + scoreX_width, 42), (25 + scoreX_width, 50)]
+    o_triangle = [(12 + scoreO_width, 70), (19 + scoreO_width, 62), (25 + scoreO_width, 70)]
+
+    draw_triangle(screen, x_triangle, X_COLOR)
+    draw_triangle(screen, o_triangle, O_COLOR)
+
+def is_goal_state(triggles_X, triggles_O, total_moves, dot_positions, n, milestone_reached):
+    total_possible_moves = 0
+    triggles_needed_for_win = 0
+
+    for i, row in enumerate(dot_positions):
+        if i < n - 1:
+            triggles_needed_for_win += len(row) * 2 - 1
+        for j, dot in enumerate(row):
+            if j + 3 < len(row):
+                total_possible_moves += 1
+
+    total_possible_moves *= 3
+
+    if total_moves >= total_possible_moves or len(triggles_X) + len(triggles_O) >= triggles_needed_for_win * 2:
+        if len(triggles_X) > len(triggles_O):
+            return True, "Igra zavrsena!\nPobednik je igrac X.", False, milestone_reached
+        elif len(triggles_O) > len(triggles_X):
+            return True, "Igra zavrsena!\nPobednik je igrac O.", False, milestone_reached
+        else:
+            return True, "Igra zavrsena!\nNeresen rezultat.", False, milestone_reached
+
+    if not milestone_reached and (len(triggles_X) > triggles_needed_for_win or len(triggles_O) > triggles_needed_for_win):
+        winner = "X" if len(triggles_X) > len(triggles_O) else "O"
+        return False, f"Igrac {winner} je pobedio. \nDa li zelite ipak da nastavite?", True, True
+
+    return False, "", False, milestone_reached
+
+def get_ai_move(dot_positions, lines, gap_size):
+    all_points = [dot for row in dot_positions for dot in row]
+    potential_moves = []
+
+    for start in all_points:
+        x1, y1 = start
+        offsets = [
+            (gap_size * 3, 0),
+            (gap_size * 1.5, gap_size * 3),
+            (-gap_size * 1.5, gap_size * 3)
+        ]
+        for dx, dy in offsets:
+            end = (x1 + dx, y1 + dy)
+            potential_moves.append((start, end))
+
+    random.shuffle(potential_moves)
+
+    for start, end in potential_moves:
+        if end in all_points and is_valid_move(start, end, gap_size, lines):
+            return start, end
+
+    return None
+
+
+def add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, player):
+    line_segments.add(frozenset((start, end)))
+
+    segments = generate_segments(start, end)
+
+    for segment in segments:
+        line_segments.add(frozenset(segment))
+
+        common_neighbors = adjacent_list[segment[0]] & adjacent_list[segment[1]]
+
+        for neighbor in common_neighbors:
+            if frozenset((segment[0], neighbor)) in line_segments and frozenset((segment[1], neighbor)) in line_segments:
+                triangle = create_triangle(segment[0], segment[1], neighbor)
+
+                if triangle not in triggles_X and triangle not in triggles_O:
+                    triggles_X.add(triangle) if player == "X" else triggles_O.add(triangle)
+
 
 def main():
     pygame.init()
@@ -200,8 +339,8 @@ def main():
     screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption("Triggle - AkoIspadne")
 
-    font = create_font(font_path,32)
-    n, player = pre_game_setup(screen, width, height, font)
+    font = create_font(font_path, 32)
+    n, player, game_mode, first_player = pre_game_setup(screen, width, height, font)
     board = create_board(n)
 
     gap_size = 46
@@ -214,14 +353,25 @@ def main():
     triggles_X = set()
     triggles_O = set()
     dot_positions = draw_board(board, screen, gap_size, selected_dots, lines)
-    adjacent_list, total_possible_moves = create_adjacent_list(dot_positions, n)
+    adjacent_list = create_adjacent_list(dot_positions)
+    milestone_reached = False
+    next_player = {'X': 'O', 'O': 'X'}
 
-    print(total_possible_moves)
+    aiplayer = next_player[player]
+
+    if first_player == player:
+        current_player = player
+    else:
+        current_player = aiplayer
+
     running = True
     while running:
         screen.fill(WHITE)
 
-        draw_scoreboard(screen, player, font, len(triggles_X), len(triggles_O))
+        if game_mode == "PvAI":
+            draw_scoreboard(screen, current_player, font, len(triggles_X), len(triggles_O))
+        else:
+            draw_scoreboard(screen, player, font, len(triggles_X), len(triggles_O))
 
         for triangle in triggles_X:
             draw_triangle(screen, triangle, X_COLOR)
@@ -256,23 +406,34 @@ def main():
                             if is_valid_move(start, end, gap_size, lines):
                                 lines.add((start, end))
 
-                                segments = generate_segments(start, end)
-                                for segment in segments:
-                                    line_segments.add(frozenset(segment))
+                                add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, current_player)
 
-                                    common_neighbors = adjacent_list[segment[0]] & adjacent_list[segment[1]]
+                                game_over, message, can_continue, milestone_reached = is_goal_state(triggles_X, triggles_O, len(lines), dot_positions, n, milestone_reached)
 
-                                    for neighbor in common_neighbors:
-                                        if frozenset((segment[0], neighbor)) in line_segments and frozenset((segment[1], neighbor)) in line_segments:
-                                            triangle = create_triangle(segment[0], segment[1], neighbor)
+                                if game_over:
+                                    show_dialog(screen, message, font, ["Zatvori"])
+                                    running = False
+                                elif can_continue:
+                                    user_choice = show_dialog(screen, message, font, ["Da", "Ne"])
+                                    if user_choice != "Da":
+                                        running = False
 
-                                            if triangle not in triggles_X and triangle not in triggles_O:
-                                                triggles_X.add(triangle) if player == "X" else triggles_O.add(triangle)
-
-                                player = "O" if player == "X" else "X"
+                                current_player = next_player[current_player]
 
                             selected_dots = []
                         break
+
+
+            if game_mode == "PvAI" and current_player == aiplayer:
+                ai_move = get_ai_move(dot_positions, lines, gap_size)
+                if ai_move:
+                    start, end = ai_move
+                    lines.add((start, end))
+
+                    add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, current_player)
+                    current_player = next_player[current_player]
+
+                selected_dots = []
 
     pygame.quit()
 
