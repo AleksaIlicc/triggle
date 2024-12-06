@@ -1,4 +1,6 @@
 import random
+import time
+
 import pygame
 from utils.colors import *
 from utils.paths import *
@@ -49,10 +51,11 @@ def pre_game_setup(screen, width, height, base_font):
     player = "X"
     game_mode = "PvP"
     first_player = "X"
+    next_player = {'X': 'O', 'O': 'X'}
 
     offset = 100
     arrow_size = 15
-    arrow_gap = 170
+    arrow_gap = 250
     running = True
 
     def draw_arrows(left_arrow, right_arrow):
@@ -76,18 +79,18 @@ def pre_game_setup(screen, width, height, base_font):
         size_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23 + offset, arrow_size, arrow_size)
         draw_arrows(size_left_arrow, size_right_arrow)
 
-        draw_text(screen, "Izaberite pocetnog igraca (X ili O):", base_font, BLACK, (width // 2, height // 3.5 + 2 * offset))
-        draw_text(screen, f"Trenutno: {player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 2 * offset))
-        player_left_arrow = pygame.Rect(width // 2 - arrow_gap, height // 3.5 + 23 + 2 * offset, arrow_size, arrow_size)
-        player_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23 + 2 * offset, arrow_size, arrow_size)
-        draw_arrows(player_left_arrow, player_right_arrow)
+        draw_text(screen, "Izaberite ko igra prvi (X ili O):", base_font, BLACK, (width // 2, height // 3.5 + 2 * offset))
+        draw_text(screen, f"Trenutno: {first_player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 2 * offset))
+        first_player_left_arrow = pygame.Rect(width // 2 - arrow_gap, height // 3.5 + 23 + 2 * offset, arrow_size, arrow_size)
+        first_player_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23 + 2 * offset, arrow_size, arrow_size)
+        draw_arrows(first_player_left_arrow, first_player_right_arrow)
 
         if game_mode == "PvAI":
-            draw_text(screen, "Izaberite ko igra prvi (X ili O):", base_font, BLACK, (width // 2, height // 3.5 + 3 * offset))
-            draw_text(screen, f"Trenutni prvi igrac: {first_player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 3 * offset))
-            ai_left_arrow = pygame.Rect(width // 2 - arrow_gap, height // 3.5 + 23 + 3 * offset, arrow_size, arrow_size)
-            ai_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23 + 3 * offset, arrow_size, arrow_size)
-            draw_arrows(ai_left_arrow, ai_right_arrow)
+            draw_text(screen, "Izaberite vaseg igraca (X ili O):", base_font, BLACK, (width // 2, height // 3.5 + 3 * offset))
+            draw_text(screen, f"Trenutni vas igrac: {player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 3 * offset))
+            player_left_arrow = pygame.Rect(width // 2 - arrow_gap, height // 3.5 + 23 + 3 * offset, arrow_size, arrow_size)
+            player_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23 + 3 * offset, arrow_size, arrow_size)
+            draw_arrows(player_left_arrow, player_right_arrow)
 
         draw_text(screen, "Pritisnite Enter za pocetak igre", base_font, BLACK, (width // 2, height // 1.15))
 
@@ -99,7 +102,7 @@ def pre_game_setup(screen, width, height, base_font):
                 exit()
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                return n, player, game_mode, first_player
+                return n, first_player, player , game_mode
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mouse_pos = pygame.mouse.get_pos()
@@ -111,10 +114,10 @@ def pre_game_setup(screen, width, height, base_font):
                     n = max(4, n - 1)
                 elif size_right_arrow.collidepoint(mouse_pos):
                     n = min(8, n + 1)
-                elif player_left_arrow.collidepoint(mouse_pos) or player_right_arrow.collidepoint(mouse_pos):
-                    player = "X" if player == "O" else "O"
-                elif game_mode == "PvAI" and (ai_left_arrow.collidepoint(mouse_pos) or ai_right_arrow.collidepoint(mouse_pos)):
-                    first_player = "X" if first_player == "O" else "O"
+                elif first_player_left_arrow.collidepoint(mouse_pos) or first_player_right_arrow.collidepoint(mouse_pos):
+                    first_player = next_player[first_player]
+                elif game_mode == "PvAI" and (player_left_arrow.collidepoint(mouse_pos) or player_right_arrow.collidepoint(mouse_pos)):
+                    player = next_player[player]
 
 
 def show_dialog(screen, message, font, options):
@@ -180,8 +183,7 @@ def draw_board(table, screen, gap_size, selected_dots, lines):
     return dot_positions
 
 def is_valid_move(start, end, gap_size, lines):
-
-    if (start,end) in lines:
+    if (start, end) in lines:
         return False
 
     dx = end[0] - start[0]
@@ -344,7 +346,7 @@ def main():
     pygame.display.set_caption("Triggle - AkoIspadne")
 
     font = create_font(font_path, 32)
-    n, player, game_mode, first_player = pre_game_setup(screen, width, height, font)
+    n, first_player, player, game_mode = pre_game_setup(screen, width, height, font)
     board = create_board(n)
 
     gap_size = 46
@@ -359,56 +361,58 @@ def main():
     dot_positions = draw_board(board, screen, gap_size, selected_dots, lines)
     adjacent_list = create_adjacent_list(dot_positions)
     milestone_reached = False
+    current_player = first_player
     next_player = {'X': 'O', 'O': 'X'}
-
-    aiplayer = next_player[player]
-
-    if first_player == player:
-        current_player = player
-    else:
-        current_player = aiplayer
+    valid_message = True
 
     running = True
     while running:
         screen.fill(WHITE)
 
         draw_scoreboard(screen, current_player, font, len(triggles_X), len(triggles_O))
-
         for triangle in triggles_X:
             draw_triangle(screen, triangle, X_COLOR)
         for triangle in triggles_O:
             draw_triangle(screen, triangle, O_COLOR)
-
         dot_positions = draw_board(board, screen, gap_size, selected_dots, lines)
 
+        if not valid_message:
+            draw_text(screen, "Potez nije validan", font, BLACK, (screen.get_width() - 220, screen.get_height() - 20),"left")
         pygame.display.flip()
 
+        if game_mode == "PvAI" and current_player != player:
+            ai_move = get_ai_move(dot_positions, lines, gap_size)
+            if ai_move:
+                time.sleep(1)
+                start, end = ai_move
+                lines.add((start, end))
+                add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, current_player)
+                current_player = next_player[current_player]
+            continue
+
         for event in pygame.event.get():
+
             if event.type == pygame.QUIT:
                 running = False
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
-
                 for row in dot_positions:
                     for dot_pos in row:
                         if not ((mouse_pos[0] - dot_pos[0]) ** 2 + (mouse_pos[1] - dot_pos[1]) ** 2 <= 100):
                             continue
-
                         if dot_pos in selected_dots:
                             selected_dots.remove(dot_pos)
                         else:
                             selected_dots.append(dot_pos)
 
-                            if not (len(selected_dots) == 2):
+                            if not(len(selected_dots)) == 2:
                                 continue
-
                             start, end = selected_dots
-                            if is_valid_move(start, end, gap_size, lines):
+                            valid_message = is_valid_move(start, end, gap_size, lines)
+                            if valid_message:
                                 lines.add((start, end))
-
                                 add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, current_player)
-
                                 game_over, message, can_continue, milestone_reached = is_goal_state(triggles_X, triggles_O, len(lines), dot_positions, n, milestone_reached)
 
                                 if game_over:
@@ -418,24 +422,11 @@ def main():
                                     user_choice = show_dialog(screen, message, font, ["Da", "Ne"])
                                     if user_choice != "Da":
                                         running = False
-
                                 current_player = next_player[current_player]
 
                             selected_dots = []
                         break
-
-
-            if game_mode == "PvAI" and current_player == aiplayer:
-                ai_move = get_ai_move(dot_positions, lines, gap_size)
-                if ai_move:
-                    start, end = ai_move
-                    lines.add((start, end))
-
-                    add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, current_player)
-                    current_player = next_player[current_player]
-
-                selected_dots = []
-
     pygame.quit()
+
 
 main()
