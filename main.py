@@ -39,6 +39,7 @@ def draw_text(screen, text, font, color, center, align='center'):
 
     screen.blit(text_surface, text_rect)
 
+
 def pre_game_setup(screen, width, height, base_font):
     pygame.font.init()
 
@@ -46,32 +47,49 @@ def pre_game_setup(screen, width, height, base_font):
 
     n = 4
     player = "X"
-    ai_player = None
     game_mode = "PvP"
     first_player = "X"
 
     offset = 100
-    while True:
+    arrow_size = 15
+    arrow_gap = 170
+    running = True
+
+    def draw_arrows(left_arrow, right_arrow):
+        pygame.draw.polygon(screen, BLACK, [(left_arrow.x, left_arrow.y + arrow_size // 2),(left_arrow.x + arrow_size, left_arrow.y),(left_arrow.x + arrow_size, left_arrow.y + arrow_size)])
+        pygame.draw.polygon(screen, BLACK, [(right_arrow.x, right_arrow.y),(right_arrow.x + arrow_size, right_arrow.y + arrow_size // 2),(right_arrow.x, right_arrow.y + arrow_size)])
+
+    while running:
         screen.fill(WHITE)
 
         draw_text(screen, "Triggle", title_font, BLACK, (width // 2, height // 5 - 50))
 
-        draw_text(screen, "Izaberite mod igre (Player vs Player ili Player vs Computer):", base_font, BLACK, (width // 2, height // 3.5))
-        draw_text(screen, f"Trenutno: {"Player vs Player" if game_mode == "PvP" else "Player vs Computer"}", base_font, BLACK, (width // 2, height // 3.5 + 30))
+        draw_text(screen, "Izaberite mod igre:", base_font, BLACK, (width // 2, height // 3.5))
+        draw_text(screen, "Player vs Player" if game_mode == "PvP" else "Player vs Computer", base_font, BLACK, (width // 2, height // 3.5 + 30))
+        mode_left_arrow = pygame.Rect(width // 2 - arrow_gap, height // 3.5 + 23, arrow_size, arrow_size)
+        mode_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23, arrow_size, arrow_size)
+        draw_arrows(mode_left_arrow, mode_right_arrow)
 
         draw_text(screen, "Izaberite velicinu table (4-8):", base_font, BLACK, (width // 2, height // 3.5 + offset))
         draw_text(screen, f"Trenutno: {n}", base_font, BLACK, (width // 2, height // 3.5 + 30 + offset))
+        size_left_arrow = pygame.Rect(width // 2 - arrow_gap, height // 3.5 + 23 + offset, arrow_size, arrow_size)
+        size_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23 + offset, arrow_size, arrow_size)
+        draw_arrows(size_left_arrow, size_right_arrow)
 
-        draw_text(screen, "Izaberite pocetnog igraca (X ili O):" if game_mode == "PvP" else "Izaberite vaseg igraca (X ili O):", base_font, BLACK, (width // 2, height // 3.5 + 2 * offset))
-        draw_text(screen, f"Trenutni igrac: {player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 2 * offset))
+        draw_text(screen, "Izaberite pocetnog igraca (X ili O):", base_font, BLACK, (width // 2, height // 3.5 + 2 * offset))
+        draw_text(screen, f"Trenutno: {player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 2 * offset))
+        player_left_arrow = pygame.Rect(width // 2 - arrow_gap, height // 3.5 + 23 + 2 * offset, arrow_size, arrow_size)
+        player_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23 + 2 * offset, arrow_size, arrow_size)
+        draw_arrows(player_left_arrow, player_right_arrow)
 
         if game_mode == "PvAI":
-            draw_text(screen, "Izaberite ko igra prvi (I za igraca ili A za AI):", base_font, BLACK, (width // 2, height // 3.5 + 3 * offset))
+            draw_text(screen, "Izaberite ko igra prvi (X ili O):", base_font, BLACK, (width // 2, height // 3.5 + 3 * offset))
             draw_text(screen, f"Trenutni prvi igrac: {first_player}", base_font, BLACK, (width // 2, height // 3.5 + 30 + 3 * offset))
+            ai_left_arrow = pygame.Rect(width // 2 - arrow_gap, height // 3.5 + 23 + 3 * offset, arrow_size, arrow_size)
+            ai_right_arrow = pygame.Rect(width // 2 + arrow_gap - arrow_size, height // 3.5 + 23 + 3 * offset, arrow_size, arrow_size)
+            draw_arrows(ai_left_arrow, ai_right_arrow)
 
-            draw_text(screen, "Pritisnite Enter za pocetak igre", base_font, BLACK, (width // 2, height // 1.15))
-        else:
-            draw_text(screen, "Pritisnite Enter za pocetak igre", base_font, BLACK, (width // 2, height // 1.15))
+        draw_text(screen, "Pritisnite Enter za pocetak igre", base_font, BLACK, (width // 2, height // 1.15))
 
         pygame.display.flip()
 
@@ -80,37 +98,23 @@ def pre_game_setup(screen, width, height, base_font):
                 pygame.quit()
                 exit()
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    return n, player, game_mode, first_player
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                return n, player, game_mode, first_player
 
-                if event.key == pygame.K_UP:
-                    n = min(8, n + 1)
-                elif event.key == pygame.K_DOWN:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mouse_pos = pygame.mouse.get_pos()
+
+                if mode_left_arrow.collidepoint(mouse_pos) or mode_right_arrow.collidepoint(mouse_pos):
+                    game_mode = "PvP" if game_mode == "PvAI" else "PvAI"
+                    offset = 80 if offset == 100 else 100
+                elif size_left_arrow.collidepoint(mouse_pos):
                     n = max(4, n - 1)
-
-                if event.key == pygame.K_x:
-                    player = "X"
-                    ai_player = "O"
-                elif event.key == pygame.K_o:
-                    player = "O"
-                    ai_player = "X"
-
-                if event.key == pygame.K_p:
-                    game_mode = "PvP"
-                    offset = 100
-                elif event.key == pygame.K_c:
-                    game_mode = "PvAI"
-                    offset = 80
-                    if player == "X":
-                        ai_player = "O"
-                    else:
-                        ai_player = "X"
-
-                if event.key == pygame.K_i:
-                    first_player = player
-                elif event.key == pygame.K_a:
-                    first_player = ai_player
+                elif size_right_arrow.collidepoint(mouse_pos):
+                    n = min(8, n + 1)
+                elif player_left_arrow.collidepoint(mouse_pos) or player_right_arrow.collidepoint(mouse_pos):
+                    player = "X" if player == "O" else "O"
+                elif game_mode == "PvAI" and (ai_left_arrow.collidepoint(mouse_pos) or ai_right_arrow.collidepoint(mouse_pos)):
+                    first_player = "X" if first_player == "O" else "O"
 
 
 def show_dialog(screen, message, font, options):
@@ -368,10 +372,7 @@ def main():
     while running:
         screen.fill(WHITE)
 
-        if game_mode == "PvAI":
-            draw_scoreboard(screen, current_player, font, len(triggles_X), len(triggles_O))
-        else:
-            draw_scoreboard(screen, player, font, len(triggles_X), len(triggles_O))
+        draw_scoreboard(screen, current_player, font, len(triggles_X), len(triggles_O))
 
         for triangle in triggles_X:
             draw_triangle(screen, triangle, X_COLOR)
