@@ -1,9 +1,9 @@
 import random
 import time
-
 import pygame
 from utils.colors import *
 from utils.paths import *
+from utils.next_player import *
 
 def setup_window(board, gap_size=44):
     total_rows = len(board)
@@ -51,7 +51,6 @@ def pre_game_setup(screen, width, height, base_font):
     player = "X"
     game_mode = "PvP"
     first_player = "X"
-    next_player = {'X': 'O', 'O': 'X'}
 
     offset = 100
     arrow_size = 15
@@ -269,7 +268,7 @@ def draw_scoreboard(screen, player, font, pointsX, pointsO):
     draw_triangle(screen, x_triangle, X_COLOR)
     draw_triangle(screen, o_triangle, O_COLOR)
 
-def is_goal_state(triggles_X, triggles_O, total_moves, dot_positions, n, milestone_reached):
+def compute_game_metrics(dot_positions, n):
     total_possible_moves = 0
     triggles_needed_for_win = 0
 
@@ -281,7 +280,9 @@ def is_goal_state(triggles_X, triggles_O, total_moves, dot_positions, n, milesto
                 total_possible_moves += 1
 
     total_possible_moves *= 3
+    return total_possible_moves, triggles_needed_for_win
 
+def is_goal_state(triggles_X, triggles_O, total_moves, total_possible_moves, triggles_needed_for_win, milestone_reached):
     if total_moves >= total_possible_moves or len(triggles_X) + len(triggles_O) >= triggles_needed_for_win * 2:
         if len(triggles_X) > len(triggles_O):
             return True, "Igra zavrsena!\nPobednik je igrac X.", False, milestone_reached
@@ -296,7 +297,7 @@ def is_goal_state(triggles_X, triggles_O, total_moves, dot_positions, n, milesto
 
     return False, "", False, milestone_reached
 
-def get_ai_move(dot_positions, lines, gap_size):
+def generate_possible_moves(dot_positions, lines, gap_size):
     all_points = [dot for row in dot_positions for dot in row]
     potential_moves = []
 
@@ -309,18 +310,42 @@ def get_ai_move(dot_positions, lines, gap_size):
         ]
         for dx, dy in offsets:
             end = (x1 + dx, y1 + dy)
-            potential_moves.append((start, end))
+            if end in all_points and is_valid_move(start, end, gap_size, lines):
+                potential_moves.append((start, end))
 
-    random.shuffle(potential_moves)
+    return potential_moves
 
-    for start, end in potential_moves:
-        if end in all_points and is_valid_move(start, end, gap_size, lines):
-            return start, end
+
+def get_ai_move(dot_positions, lines, gap_size):
+    possible_moves = generate_possible_moves(dot_positions, lines, gap_size)
+
+    if possible_moves:
+        random.shuffle(possible_moves)
+        return possible_moves[0]
 
     return None
 
+def generate_possible_states(dot_positions, lines, gap_size, current_player, triggles_X, triggles_O, adjacent_list, line_segments):
+    possible_moves = generate_possible_moves(dot_positions, lines, gap_size)
+    possible_states = []
 
-def add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, player):
+    for move in possible_moves:
+        new_lines = lines.copy()
+        new_line_segments = line_segments.copy()
+        new_triggles_X = triggles_X.copy()
+        new_triggles_O = triggles_O.copy()
+        start, end = move
+
+        new_lines.add((start, end))
+        add_triggles_if_valid(start, end, adjacent_list, new_lines, new_line_segments, new_triggles_X, new_triggles_O, current_player)
+
+        possible_states.append((new_lines, new_triggles_X, new_triggles_O, next_player[current_player]))
+
+    return possible_states
+
+
+def add_triggles_if_valid(start, end, adjacent_list, lines, line_segments, triggles_X, triggles_O, player):
+    lines.add((start, end))
     line_segments.add(frozenset((start, end)))
 
     segments = generate_segments(start, end)
@@ -353,40 +378,48 @@ def main():
     window_width, window_height = setup_window(board, gap_size)
     screen = pygame.display.set_mode((window_width, window_height))
 
+    game_state = {
+        "lines": set(),
+        "line_segments": set(),
+        "triggles_X": set(),
+        "triggles_O": set(),
+        "current_player": "X",
+        "milestone_reached": False
+    }
+
     selected_dots = []
-    lines = set()
-    line_segments = set()
-    triggles_X = set()
-    triggles_O = set()
-    dot_positions = draw_board(board, screen, gap_size, selected_dots, lines)
+    dot_positions = draw_board(board, screen, gap_size, selected_dots, game_state['lines'])
+    total_possible_moves, triggles_needed_for_win = compute_game_metrics(dot_positions, n)
     adjacent_list = create_adjacent_list(dot_positions)
-    milestone_reached = False
+
     current_player = first_player
-    next_player = {'X': 'O', 'O': 'X'}
-    valid_message = True
+
+    milestone_reached = False
+    valid_move = True
 
     running = True
     while running:
         screen.fill(WHITE)
 
-        draw_scoreboard(screen, current_player, font, len(triggles_X), len(triggles_O))
-        for triangle in triggles_X:
+        draw_scoreboard(screen, current_player, font, len(game_state['triggles_X']), len(game_state['triggles_O']))
+        for triangle in game_state['triggles_X']:
             draw_triangle(screen, triangle, X_COLOR)
-        for triangle in triggles_O:
+        for triangle in game_state['triggles_O']:
             draw_triangle(screen, triangle, O_COLOR)
-        dot_positions = draw_board(board, screen, gap_size, selected_dots, lines)
+        dot_positions = draw_board(board, screen, gap_size, selected_dots, game_state['lines'])
 
-        if not valid_message:
+        if not valid_move:
             draw_text(screen, "Potez nije validan", font, BLACK, (screen.get_width() - 220, screen.get_height() - 20),"left")
         pygame.display.flip()
 
         if game_mode == "PvAI" and current_player != player:
-            ai_move = get_ai_move(dot_positions, lines, gap_size)
+            generate_possible_states(dot_positions, game_state['lines'], gap_size, game_state['current_player'], game_state['triggles_X'], game_state['triggles_O'], adjacent_list, game_state['line_segments'])
+            ai_move = get_ai_move(dot_positions, game_state['lines'], gap_size)
             if ai_move:
                 time.sleep(1)
                 start, end = ai_move
-                lines.add((start, end))
-                add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, current_player)
+                game_state['lines'].add((start, end))
+                add_triggles_if_valid(start, end, adjacent_list, game_state['line_segments'], game_state['triggles_X'], game_state['triggles_O'], current_player)
                 current_player = next_player[current_player]
             continue
 
@@ -409,11 +442,10 @@ def main():
                             if not(len(selected_dots)) == 2:
                                 continue
                             start, end = selected_dots
-                            valid_message = is_valid_move(start, end, gap_size, lines)
-                            if valid_message:
-                                lines.add((start, end))
-                                add_triggles_if_valid(start, end, adjacent_list, line_segments, triggles_X, triggles_O, current_player)
-                                game_over, message, can_continue, milestone_reached = is_goal_state(triggles_X, triggles_O, len(lines), dot_positions, n, milestone_reached)
+                            valid_move = is_valid_move(start, end, gap_size, game_state['lines'])
+                            if valid_move:
+                                add_triggles_if_valid(start, end, adjacent_list, game_state['lines'], game_state['line_segments'], game_state['triggles_X'], game_state['triggles_O'], current_player)
+                                game_over, message, can_continue, milestone_reached = is_goal_state(game_state['triggles_X'], game_state['triggles_O'], len(game_state['lines']), total_possible_moves, triggles_needed_for_win, milestone_reached)
 
                                 if game_over:
                                     show_dialog(screen, message, font, ["Zatvori"])

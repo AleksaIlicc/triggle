@@ -1,0 +1,1 @@
+next_player = {'X': 'O', 'O': 'X'}
