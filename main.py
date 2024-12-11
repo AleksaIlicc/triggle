@@ -288,23 +288,26 @@ def compute_game_metrics(dot_positions, n):
     total_possible_moves *= 3
     return total_possible_moves, triggles_needed_for_win
 
-def is_goal_state(game_state, total_possible_moves, triggles_needed_for_win, milestone_reached):
+def is_goal_state(game_state, total_possible_moves, triggles_needed_for_win):
     triggles_X = game_state["triggles_X"]
     triggles_O = game_state["triggles_O"]
     total_moves = len(game_state['lines'])
+    milestone_reached = game_state["milestone_reached"]
+
     if total_moves >= total_possible_moves or len(triggles_X) + len(triggles_O) >= triggles_needed_for_win * 2:
         if len(triggles_X) > len(triggles_O):
-            return True, "Igra zavrsena!\nPobednik je igrac X.", False, milestone_reached
+            return True, "Igra zavrsena!\nPobednik je igrac X.", False
         elif len(triggles_O) > len(triggles_X):
-            return True, "Igra zavrsena!\nPobednik je igrac O.", False, milestone_reached
+            return True, "Igra zavrsena!\nPobednik je igrac O.", False
         else:
-            return True, "Igra zavrsena!\nNeresen rezultat.", False, milestone_reached
+            return True, "Igra zavrsena!\nNeresen rezultat.", False
 
     if not milestone_reached and (len(triggles_X) > triggles_needed_for_win or len(triggles_O) > triggles_needed_for_win):
         winner = "X" if len(triggles_X) > len(triggles_O) else "O"
-        return False, f"Igrac {winner} je pobedio. \nDa li zelite ipak da nastavite?", True, True
+        game_state["milestone_reached"] = True
+        return False, f"Igrac {winner} je pobedio. \nDa li zelite ipak da nastavite?", True
 
-    return False, "", False, milestone_reached
+    return False, "", False
 
 def generate_possible_moves(dot_positions, game_state, gap_size):
     all_points = [dot for row in dot_positions for dot in row]
@@ -325,16 +328,41 @@ def generate_possible_moves(dot_positions, game_state, gap_size):
     return potential_moves
 
 
-def get_ai_move(dot_positions, game_state, gap_size):
-    possible_moves = generate_possible_moves(dot_positions, game_state, gap_size)
+def evaluate_game_state(game_state):
+    return len(game_state["triggles_X"]) - len(game_state["triggles_O"])
 
-    if possible_moves:
-        random.shuffle(possible_moves)
-        return possible_moves[0]
 
-    return None
+def minimax(game_state, depth, maximizing_player, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win):
+    if depth == 0 or is_goal_state(game_state, total_possible_moves, triggles_needed_for_win)[0]:
+        return evaluate_game_state(game_state), None
 
-def generate_possible_states(dot_positions, gap_size, adjacent_list,game_state):
+    possible_states = generate_possible_states(dot_positions, gap_size, adjacent_list, game_state)
+    best_move = None
+
+    if maximizing_player:
+        max_eval = float('-inf')
+        for state in possible_states:
+            eval_score, _ = minimax(state, depth - 1, False, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win)
+            if eval_score > max_eval:
+                max_eval = eval_score
+                best_move = state["lines"] - game_state["lines"]  # Pronađi potez
+        return max_eval, best_move.pop() if best_move else None
+    else:
+        min_eval = float('inf')
+        for state in possible_states:
+            eval_score, _ = minimax(state, depth - 1, True, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win)
+            if eval_score < min_eval:
+                min_eval = eval_score
+                best_move = state["lines"] - game_state["lines"]  # Pronađi potez
+        return min_eval, best_move.pop() if best_move else None
+
+
+def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, depth = 2):
+    _, best_move = minimax(game_state, depth, True, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win)
+    return best_move
+
+
+def generate_possible_states(dot_positions, gap_size, adjacent_list, game_state):
     lines = game_state["lines"]
     triggles_X = game_state["triggles_X"]
     triggles_O = game_state["triggles_O"]
@@ -384,6 +412,20 @@ def add_triggles_if_valid(start, end, adjacent_list, game_state):
                 if triangle not in triggles_X and triangle not in triggles_O:
                     triggles_X.add(triangle) if player == "X" else triggles_O.add(triangle)
 
+def handle_end_of_turn(screen, font, game_state, total_possible_moves, triggles_needed_for_win):
+    game_over, message, can_continue = is_goal_state(game_state, total_possible_moves, triggles_needed_for_win)
+
+    if game_over:
+        show_dialog(screen, message, font, ["Zatvori"])
+        return False
+
+    if can_continue:
+        user_choice = show_dialog(screen, message, font, ["Da", "Ne"])
+        if user_choice != "Da":
+            return False
+
+    game_state["current_player"] = next_player[game_state["current_player"]]
+    return True
 
 def main():
     pygame.init()
@@ -414,7 +456,6 @@ def main():
     total_possible_moves, triggles_needed_for_win = compute_game_metrics(dot_positions, n)
     adjacent_list = create_adjacent_list(dot_positions)
 
-    milestone_reached = False
     valid_move = True
 
     running = True
@@ -433,13 +474,12 @@ def main():
         pygame.display.flip()
 
         if game_mode == "PvAI" and game_state["current_player"] != player:
-            generate_possible_states(dot_positions, gap_size, adjacent_list, game_state)
-            ai_move = get_ai_move(dot_positions, game_state, gap_size)
+            ai_move = get_ai_move(dot_positions, game_state, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win)
             if ai_move:
-                time.sleep(1)
                 start, end = ai_move
                 add_triggles_if_valid(start, end, adjacent_list, game_state)
-                game_state["current_player"] = next_player[game_state["current_player"]]
+                if not handle_end_of_turn(screen, font, game_state, total_possible_moves, triggles_needed_for_win):
+                    running = False
             continue
 
         for event in pygame.event.get():
@@ -464,17 +504,8 @@ def main():
                             valid_move = is_valid_move(start, end, gap_size, game_state)
                             if valid_move:
                                 add_triggles_if_valid(start, end, adjacent_list, game_state)
-                                game_over, message, can_continue, milestone_reached = is_goal_state(game_state, total_possible_moves, triggles_needed_for_win, milestone_reached)
-
-                                if game_over:
-                                    show_dialog(screen, message, font, ["Zatvori"])
+                                if not handle_end_of_turn(screen, font, game_state, total_possible_moves, triggles_needed_for_win):
                                     running = False
-                                elif can_continue:
-                                    user_choice = show_dialog(screen, message, font, ["Da", "Ne"])
-                                    if user_choice != "Da":
-                                        running = False
-                                game_state["current_player"] = next_player[game_state["current_player"]]
-
                             selected_dots = []
                         break
     pygame.quit()
