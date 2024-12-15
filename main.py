@@ -327,12 +327,11 @@ def generate_possible_moves(dot_positions, game_state, gap_size):
 
     return potential_moves
 
-
 def evaluate_game_state(game_state):
     return len(game_state["triggles_X"]) - len(game_state["triggles_O"])
 
 
-def minimax(game_state, depth, maximizing_player, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win):
+def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, alpha, beta):
     if depth == 0 or is_goal_state(game_state, total_possible_moves, triggles_needed_for_win)[0]:
         return evaluate_game_state(game_state), None
 
@@ -342,25 +341,30 @@ def minimax(game_state, depth, maximizing_player, dot_positions, gap_size, adjac
     if maximizing_player:
         max_eval = float('-inf')
         for state in possible_states:
-            eval_score, _ = minimax(state, depth - 1, False, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win)
+            eval_score, _ = minmax(state, depth - 1, False, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, alpha, beta)
             if eval_score > max_eval:
                 max_eval = eval_score
-                best_move = state["lines"] - game_state["lines"]  # Pronađi potez
+                best_move = state["lines"] - game_state["lines"]
+            alpha = max(alpha, eval_score)
+            if beta <= alpha:
+                break
         return max_eval, best_move.pop() if best_move else None
     else:
         min_eval = float('inf')
         for state in possible_states:
-            eval_score, _ = minimax(state, depth - 1, True, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win)
+            eval_score, _ = minmax(state, depth - 1, True, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, alpha, beta)
             if eval_score < min_eval:
                 min_eval = eval_score
-                best_move = state["lines"] - game_state["lines"]  # Pronađi potez
+                best_move = state["lines"] - game_state["lines"]
+            beta = min(beta, eval_score)
+            if beta <= alpha:
+                break
         return min_eval, best_move.pop() if best_move else None
 
 
-def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, depth = 2):
-    _, best_move = minimax(game_state, depth, True, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win)
+def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, depth = 3):
+    _, best_move = minmax(game_state, depth, True, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, float('-inf'), float('inf'))
     return best_move
-
 
 def generate_possible_states(dot_positions, gap_size, adjacent_list, game_state):
     lines = game_state["lines"]
