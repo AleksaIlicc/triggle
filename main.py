@@ -3,9 +3,6 @@ from utils.colors import *
 from utils.paths import *
 from utils.next_player import *
 
-# Debug toggle - set True to enable internal logs
-DEBUG = False
-
 def setup_window(board, gap_size=44):
     total_rows = len(board)
     max_dots = max(board)
@@ -41,7 +38,6 @@ def draw_text(screen, text, font, color, center, align='center'):
         text_rect.midleft = center
 
     screen.blit(text_surface, text_rect)
-
 
 def pre_game_setup(screen, width, height, base_font):
     pygame.font.init()
@@ -118,7 +114,6 @@ def pre_game_setup(screen, width, height, base_font):
                     first_player = next_player[first_player]
                 elif game_mode == "PvAI" and (player_left_arrow.collidepoint(mouse_pos) or player_right_arrow.collidepoint(mouse_pos)):
                     player = next_player[player]
-
 
 def show_dialog(screen, message, font, options):
     screen.fill(WHITE)
@@ -340,7 +335,6 @@ def generate_possible_moves(dot_positions, game_state, gap_size):
 def evaluate_game_state(game_state):
     return len(game_state["triggles_X"]) - len(game_state["triggles_O"])
 
-
 def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, alpha, beta):
     if depth == 0 or is_goal_state(game_state, triggles_needed_for_win)[0]:
         return evaluate_game_state(game_state), None
@@ -371,7 +365,6 @@ def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjace
                 break
         return min_eval, best_move.pop() if best_move else None
 
-
 def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, triggles_needed_for_win, depth = None):
     dynamic_depth = depth
     if depth is None:
@@ -382,7 +375,6 @@ def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, triggles_nee
     print(is_maximizing)
     _, best_move = minmax(game_state, dynamic_depth, is_maximizing, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, float('-inf'), float('inf'))
     return best_move
-
 
 def compute_ai_depth(game_state, triggles_needed_for_win):
     base_depth = 2
@@ -437,7 +429,6 @@ def generate_possible_states(dot_positions, gap_size, adjacent_list, game_state)
         possible_states.append(new_game_state)
 
     return possible_states
-
 
 def add_triggles_if_valid(start, end, adjacent_list, game_state):
     triggles_O = game_state["triggles_O"]
@@ -558,6 +549,5 @@ def main():
                             selected_dots = []
                         break
     pygame.quit()
-
 
 main()
