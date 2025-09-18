@@ -228,6 +228,7 @@ def create_triangle(point1, point2, point3):
 
 def create_adjacent_list(dot_positions):
     adjacent_list = {}
+    n_half = len(dot_positions) // 2 + 1
 
     for i, row in enumerate(dot_positions):
         for j, dot in enumerate(row):
@@ -240,21 +241,30 @@ def create_adjacent_list(dot_positions):
 
             if i > 0:
                 prev_row = dot_positions[i - 1]
-                if j < len(prev_row):
+                
+                if i < n_half:
+                    if j > 0:
+                        adjacent_list[dot].add(prev_row[j - 1])
+                    if j < len(prev_row):
+                        adjacent_list[dot].add(prev_row[j])
+                        
+                else: 
                     adjacent_list[dot].add(prev_row[j])
-                if j > 0:
-                    adjacent_list[dot].add(prev_row[j - 1])
-                if j < len(prev_row) - 1:
                     adjacent_list[dot].add(prev_row[j + 1])
 
             if i < len(dot_positions) - 1:
                 next_row = dot_positions[i + 1]
-                if j < len(next_row):
+                
+                if i < n_half - 1: 
                     adjacent_list[dot].add(next_row[j])
-                if j > 0:
-                    adjacent_list[dot].add(next_row[j - 1])
-                if j < len(next_row) - 1:
                     adjacent_list[dot].add(next_row[j + 1])
+                        
+                else:  
+                    if j > 0:
+                        adjacent_list[dot].add(next_row[j - 1])
+                    if j < len(next_row):
+                        adjacent_list[dot].add(next_row[j])
+                        
     return adjacent_list
 
 def create_font(path, size):
@@ -368,7 +378,8 @@ def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, triggles_nee
         dynamic_depth = compute_ai_depth(game_state, triggles_needed_for_win)
         print(dynamic_depth)
 
-    is_maximizing = game_state["current_player"] == "O"
+    is_maximizing = game_state["current_player"] == "X" 
+    print(is_maximizing)
     _, best_move = minmax(game_state, dynamic_depth, is_maximizing, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, float('-inf'), float('inf'))
     return best_move
 
@@ -415,12 +426,14 @@ def generate_possible_states(dot_positions, gap_size, adjacent_list, game_state)
         "line_segments": line_segments.copy(),
         "triggles_X": triggles_X.copy(),
         "triggles_O": triggles_O.copy(),
-        "current_player": next_player[current_player],
+        "current_player": current_player,
         "milestone_reached": milestone_reached
         }
         start, end = move
-        new_game_state["lines"].add((start, end))
+
         add_triggles_if_valid(start, end, adjacent_list, new_game_state)
+        new_game_state["current_player"] = next_player[current_player]
+
         possible_states.append(new_game_state)
 
     return possible_states
@@ -433,7 +446,6 @@ def add_triggles_if_valid(start, end, adjacent_list, game_state):
     line_segments = game_state["line_segments"]
     player = game_state["current_player"]
     lines.add((start, end))
-    line_segments.add(frozenset((start, end)))
 
     segments = generate_segments(start, end)
 
