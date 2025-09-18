@@ -1,5 +1,3 @@
-import random
-import time
 import pygame
 from utils.colors import *
 from utils.paths import *
@@ -184,7 +182,13 @@ def draw_board(table, screen, gap_size, selected_dots, game_state):
 
 def is_valid_move(start, end, gap_size, game_state):
     lines = game_state["lines"]
+    line_segments = game_state["line_segments"]
+    
     if (start, end) in lines:
+        return False
+
+    segments = generate_segments(start, end)
+    if all(frozenset(segment) in line_segments for segment in segments):
         return False
 
     dx = end[0] - start[0]
@@ -275,26 +279,20 @@ def draw_scoreboard(screen, font, game_state):
     draw_triangle(screen, o_triangle, O_COLOR)
 
 def compute_game_metrics(dot_positions, n):
-    total_possible_moves = 0
     triggles_needed_for_win = 0
 
     for i, row in enumerate(dot_positions):
         if i < n - 1:
             triggles_needed_for_win += len(row) * 2 - 1
-        for j, dot in enumerate(row):
-            if j + 3 < len(row):
-                total_possible_moves += 1
 
-    total_possible_moves *= 3
-    return total_possible_moves, triggles_needed_for_win
+    return triggles_needed_for_win
 
-def is_goal_state(game_state, total_possible_moves, triggles_needed_for_win):
+def is_goal_state(game_state, triggles_needed_for_win):
     triggles_X = game_state["triggles_X"]
     triggles_O = game_state["triggles_O"]
-    total_moves = len(game_state['lines'])
     milestone_reached = game_state["milestone_reached"]
 
-    if total_moves >= total_possible_moves or len(triggles_X) + len(triggles_O) >= triggles_needed_for_win * 2:
+    if len(triggles_X) + len(triggles_O) >= triggles_needed_for_win * 2:
         if len(triggles_X) > len(triggles_O):
             return True, "Igra zavrsena!\nPobednik je igrac X.", False
         elif len(triggles_O) > len(triggles_X):
@@ -331,8 +329,8 @@ def evaluate_game_state(game_state):
     return len(game_state["triggles_X"]) - len(game_state["triggles_O"])
 
 
-def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, alpha, beta):
-    if depth == 0 or is_goal_state(game_state, total_possible_moves, triggles_needed_for_win)[0]:
+def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, alpha, beta):
+    if depth == 0 or is_goal_state(game_state, triggles_needed_for_win)[0]:
         return evaluate_game_state(game_state), None
 
     possible_states = generate_possible_states(dot_positions, gap_size, adjacent_list, game_state)
@@ -341,7 +339,7 @@ def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjace
     if maximizing_player:
         max_eval = float('-inf')
         for state in possible_states:
-            eval_score, _ = minmax(state, depth - 1, False, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, alpha, beta)
+            eval_score, _ = minmax(state, depth - 1, False, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, alpha, beta)
             if eval_score > max_eval:
                 max_eval = eval_score
                 best_move = state["lines"] - game_state["lines"]
@@ -352,7 +350,7 @@ def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjace
     else:
         min_eval = float('inf')
         for state in possible_states:
-            eval_score, _ = minmax(state, depth - 1, True, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, alpha, beta)
+            eval_score, _ = minmax(state, depth - 1, True, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, alpha, beta)
             if eval_score < min_eval:
                 min_eval = eval_score
                 best_move = state["lines"] - game_state["lines"]
@@ -362,8 +360,10 @@ def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjace
         return min_eval, best_move.pop() if best_move else None
 
 
-def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, depth = 3):
-    _, best_move = minmax(game_state, depth, True, dot_positions, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win, float('-inf'), float('inf'))
+def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, triggles_needed_for_win, depth = 3):
+    is_maximizing = game_state["current_player"] == "O"
+    print(is_maximizing)
+    _, best_move = minmax(game_state, depth, is_maximizing, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, float('-inf'), float('inf'))
     return best_move
 
 def generate_possible_states(dot_positions, gap_size, adjacent_list, game_state):
@@ -416,8 +416,8 @@ def add_triggles_if_valid(start, end, adjacent_list, game_state):
                 if triangle not in triggles_X and triangle not in triggles_O:
                     triggles_X.add(triangle) if player == "X" else triggles_O.add(triangle)
 
-def handle_end_of_turn(screen, font, game_state, total_possible_moves, triggles_needed_for_win):
-    game_over, message, can_continue = is_goal_state(game_state, total_possible_moves, triggles_needed_for_win)
+def handle_end_of_turn(screen, font, game_state, triggles_needed_for_win):
+    game_over, message, can_continue = is_goal_state(game_state, triggles_needed_for_win)
 
     if game_over:
         show_dialog(screen, message, font, ["Zatvori"])
@@ -457,7 +457,7 @@ def main():
 
     selected_dots = []
     dot_positions = draw_board(board, screen, gap_size, selected_dots, game_state)
-    total_possible_moves, triggles_needed_for_win = compute_game_metrics(dot_positions, n)
+    triggles_needed_for_win = compute_game_metrics(dot_positions, n)
     adjacent_list = create_adjacent_list(dot_positions)
 
     valid_move = True
@@ -478,11 +478,11 @@ def main():
         pygame.display.flip()
 
         if game_mode == "PvAI" and game_state["current_player"] != player:
-            ai_move = get_ai_move(dot_positions, game_state, gap_size, adjacent_list, total_possible_moves, triggles_needed_for_win)
+            ai_move = get_ai_move(dot_positions, game_state, gap_size, adjacent_list, triggles_needed_for_win)
             if ai_move:
                 start, end = ai_move
                 add_triggles_if_valid(start, end, adjacent_list, game_state)
-                if not handle_end_of_turn(screen, font, game_state, total_possible_moves, triggles_needed_for_win):
+                if not handle_end_of_turn(screen, font, game_state, triggles_needed_for_win):
                     running = False
             continue
 
@@ -508,7 +508,7 @@ def main():
                             valid_move = is_valid_move(start, end, gap_size, game_state)
                             if valid_move:
                                 add_triggles_if_valid(start, end, adjacent_list, game_state)
-                                if not handle_end_of_turn(screen, font, game_state, total_possible_moves, triggles_needed_for_win):
+                                if not handle_end_of_turn(screen, font, game_state, triggles_needed_for_win):
                                     running = False
                             selected_dots = []
                         break
