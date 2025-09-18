@@ -3,6 +3,9 @@ from utils.colors import *
 from utils.paths import *
 from utils.next_player import *
 
+# Debug toggle - set True to enable internal logs
+DEBUG = False
+
 def setup_window(board, gap_size=44):
     total_rows = len(board)
     max_dots = max(board)
@@ -284,7 +287,6 @@ def compute_game_metrics(dot_positions, n):
     for i, row in enumerate(dot_positions):
         if i < n - 1:
             triggles_needed_for_win += len(row) * 2 - 1
-
     return triggles_needed_for_win
 
 def is_goal_state(game_state, triggles_needed_for_win):
@@ -360,11 +362,42 @@ def minmax(game_state, depth, maximizing_player, dot_positions, gap_size, adjace
         return min_eval, best_move.pop() if best_move else None
 
 
-def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, triggles_needed_for_win, depth = 3):
+def get_ai_move(dot_positions, game_state, gap_size, adjacent_list, triggles_needed_for_win, depth = None):
+    dynamic_depth = depth
+    if depth is None:
+        dynamic_depth = compute_ai_depth(game_state, triggles_needed_for_win)
+        print(dynamic_depth)
+
     is_maximizing = game_state["current_player"] == "O"
-    print(is_maximizing)
-    _, best_move = minmax(game_state, depth, is_maximizing, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, float('-inf'), float('inf'))
+    _, best_move = minmax(game_state, dynamic_depth, is_maximizing, dot_positions, gap_size, adjacent_list, triggles_needed_for_win, float('-inf'), float('inf'))
     return best_move
+
+
+def compute_ai_depth(game_state, triggles_needed_for_win):
+    base_depth = 2
+
+    x_count = len(game_state["triggles_X"])
+    o_count = len(game_state["triggles_O"])
+    total_captured = x_count + o_count
+    total_possible = triggles_needed_for_win * 2
+    remaining = max(0, total_possible - total_captured)
+    print(remaining)
+
+    depth = base_depth
+    if remaining < 8:
+        depth += 6
+    elif remaining < 12:
+        depth += 5
+    elif remaining < 16:
+        depth += 4
+    elif remaining < 23:
+        depth += 3
+    elif remaining < 54:
+        depth += 2
+    elif remaining < 96:
+        depth += 1
+
+    return max(2, min(depth, 8))
 
 def generate_possible_states(dot_positions, gap_size, adjacent_list, game_state):
     lines = game_state["lines"]
